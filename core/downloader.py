@@ -7,6 +7,7 @@ from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 from colorama import Fore, Style
 from .naming import safe_filename
+from config import NHNDL_DOWNLOADS, ensure_dirs
 
 MAX_IMAGE_THREADS = 12
 
@@ -74,9 +75,19 @@ def create_cbz(img_files, outpath):
 def images_to_pdf(img_files, pdf_path):
     try:
         from PIL import Image
-        imgs = [Image.open(img).convert("RGB") for img in img_files]
-        if imgs:
-            imgs[0].save(pdf_path, save_all=True, append_images=imgs[1:])
+        images = []
+        for img_path in img_files:
+            try:
+                im = Image.open(img_path)
+                if im.format.lower() == "webp":
+                    im = im.convert("RGB")
+                elif im.mode != "RGB":
+                    im = im.convert("RGB")
+                images.append(im)
+            except Exception as e:
+                print(f"{Fore.YELLOW}[WARN]{Style.RESET_ALL} Skipping {img_path} for PDF: {e}")
+        if images:
+            images[0].save(pdf_path, save_all=True, append_images=images[1:])
     except Exception as e:
         print(f"{Fore.RED}[ERROR]{Style.RESET_ALL} Failed to create PDF: {e}")
 
@@ -118,6 +129,11 @@ def download_gallery(
     filename_template="{id} - {title}",
     max_filename_len=150
 ):
+    ensure_dirs()
+    # Set default directory if not provided
+    if not dest_dir:
+        dest_dir = NHNDL_DOWNLOADS
+
     try:
         gallery_id = get_gallery_id(arg)
     except Exception as e:
