@@ -19,34 +19,31 @@ def show_batch_txt_guide():
     print(c("yellow", "• All galleries under the last '>>' go into a folder named after the series."))
     print(c("yellow", "• Single galleries (not under any '>>') are downloaded normally.\n"))
     print(c("yellow", f"Place your txt file anywhere and enter the full path, or put it in {NHNDL_HOME} for convenience."))
+    print(c("cyan", "\n[Tip] How to get the full path of your .txt file:"))
+    print(c("yellow", "• On Linux/Termux: Open a new session in your terminal, and use the command:"))
+    print(c("white", "  realpath yourfile.txt"))
+    print(c("yellow", "  This will print the absolute path, which you can copy and paste when prompted."))
+    print(c("yellow", "• On Windows: Right-click the file while holding Shift, then select 'Copy as path'."))
+    print(c("green", f"\n[Info] You can keep your main batch list at {os.path.join(NHNDL_HOME, 'list.txt')} and add new downloads by editing it anytime!"))
+    print(c("yellow", f"If you create a new file, always make sure it's in your home directory for best compatibility."))
 
-def parse_batch_txt(txt_path):
-    """
-    Parses batch .txt file into: 
-    - singles: [id_or_url, ...]
-    - series: {series_name: [id_or_url, ...], ...}
-    """
-    singles = []
-    series = {}
-    current_series = None
-    try:
-        with open(txt_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                if line.startswith(">>"):
-                    current_series = line[2:].strip()
-                    if current_series not in series:
-                        series[current_series] = []
-                else:
-                    if current_series:
-                        series[current_series].append(line)
-                    else:
-                        singles.append(line)
-    except Exception as e:
-        print(c("red", f"[ERROR] Could not read TXT: {e}"))
-    return singles, series
+def ensure_default_list_txt():
+    """Create ~/Nhndl/list.txt if it doesn't exist."""
+    path = os.path.join(NHNDL_HOME, "list.txt")
+    if not os.path.exists(path):
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("# Your NHNDL batch download list\n")
+                f.write("# Add one gallery ID or URL per line. Lines starting with # are ignored.\n")
+                f.write("# Example:\n")
+                f.write("123456\n")
+                f.write("https://nhentai.net/g/789012\n")
+                f.write(">> My Series\n")
+                f.write("112233\n")
+                f.write("#445566\n")
+            print(c("green", f"\nCreated default list.txt at {path}. Edit this file to add or remove galleries anytime!\n"))
+        except Exception as e:
+            print(c("red", f"[ERROR] Could not create default list.txt: {e}"))
 
 def main_menu():
     print(c("cyan", "What do you want to do?"))
@@ -61,7 +58,6 @@ class NhndlTUI:
     def __init__(self, config):
         self.config = config
         ensure_dirs()
-        # Always use the default if missing or blank
         if not self.config.get('download_dir'):
             self.config['download_dir'] = NHNDL_DOWNLOADS
         else:
@@ -104,8 +100,14 @@ class NhndlTUI:
                         break
             elif choice == "3":
                 show_batch_txt_guide()
+                ensure_default_list_txt()
+                print(c("magenta", f"\nYou can edit {os.path.join(NHNDL_HOME, 'list.txt')} to manage your downloads."))
+                print(c("magenta", "Or, enter the path to another .txt file if you want to use a different list."))
+                print(c("yellow", "(Leave blank to use the default list.txt in your NHNDL home directory.)"))
                 path = input(c("magenta", "Enter path to your .txt file: ")).strip()
-                if not path or not os.path.exists(path):
+                if not path:
+                    path = os.path.join(NHNDL_HOME, "list.txt")
+                if not os.path.exists(path):
                     print(c("red", f"[ERROR] File does not exist: {path}"))
                     continue
                 singles, series = parse_batch_txt(path)
@@ -142,10 +144,32 @@ class NhndlTUI:
                 print(c("red", "Invalid choice. Try again."))
 
 def safe_folder(name, max_len=80):
-    # For series folders, sanitize
     import re
     name = re.sub(r'[<>:"/\\|?*]', '', name)
     name = re.sub(r'\s+', ' ', name).strip()
     if len(name) > max_len:
         name = name[:max_len].rstrip()
     return name
+
+def parse_batch_txt(txt_path):
+    singles = []
+    series = {}
+    current_series = None
+    try:
+        with open(txt_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.startswith(">>"):
+                    current_series = line[2:].strip()
+                    if current_series not in series:
+                        series[current_series] = []
+                else:
+                    if current_series:
+                        series[current_series].append(line)
+                    else:
+                        singles.append(line)
+    except Exception as e:
+        print(c("red", f"[ERROR] Could not read TXT: {e}"))
+    return singles, series
