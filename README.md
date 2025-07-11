@@ -1,6 +1,6 @@
 # NHNDL: nhentai Batch Downloader 🚀
 
-![NHNDL Banner](https://files.catbox.moe/2yff0e.png)
+![NHNDL Banner](https://files.catbox.moe/q7v6dz.png)
 
 > **Note:** This project contains AI-generated content. The code, documentation, and features have been shaped with the help of AI tools, but the vision and polish come from the project owner.
 
