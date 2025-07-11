@@ -86,6 +86,15 @@ def clean_folder(folder):
     except Exception:
         pass
 
+def get_cbz_page_count(cbz_path):
+    """Returns the number of image files in an existing CBZ archive."""
+    try:
+        with ZipFile(cbz_path, 'r') as zipf:
+            count = len([f for f in zipf.namelist() if f.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp'))])
+        return count
+    except Exception:
+        return 0
+
 def download_gallery(arg, dest_dir=None, custom_cbz=None, threads=MAX_IMAGE_THREADS, save_pdf=False):
     try:
         gallery_id = get_gallery_id(arg)
@@ -109,15 +118,28 @@ def download_gallery(arg, dest_dir=None, custom_cbz=None, threads=MAX_IMAGE_THRE
         cbz_name = custom_cbz if custom_cbz else f"{safe_title}.cbz"
         cbz_path = os.path.join(dest_dir, cbz_name) if dest_dir else cbz_name
 
-    if os.path.exists(cbz_path):
-        print(f"{Fore.CYAN}[SKIP]{Style.RESET_ALL} {cbz_path} already exists.")
-        return
-
     media_id = data['media_id']
     pages = data['images']['pages']
+    page_count = len(pages)
+
+    # --- Error Handling: Existing File Check ---
+    if os.path.exists(cbz_path):
+        existing_count = get_cbz_page_count(cbz_path)
+        if existing_count == page_count:
+            print(f"{Fore.CYAN}[SKIP]{Style.RESET_ALL} {cbz_path} already exists with {existing_count} pages.")
+            return
+        else:
+            print(f"{Fore.YELLOW}[WARNING]{Style.RESET_ALL} File '{cbz_path}' exists with {existing_count} pages, but gallery has {page_count} pages.")
+            resp = input(f"Do you want to overwrite the existing file? (y/n): ").strip().lower()
+            if resp != 'y':
+                print(f"{Fore.LIGHTYELLOW_EX}Skipping download for: {cbz_path}{Style.RESET_ALL}")
+                return
+            else:
+                print(f"{Fore.YELLOW}Overwriting: {cbz_path}{Style.RESET_ALL}")
+
     tmp_folder = f"tmp_{gallery_id}"
 
-    print(f"{Fore.GREEN}==> Downloading:{Style.RESET_ALL} {Fore.WHITE}{cbz_name}{Style.RESET_ALL} {Fore.MAGENTA}(ID: {gallery_id}){Style.RESET_ALL} - {len(pages)} pages")
+    print(f"{Fore.GREEN}==> Downloading:{Style.RESET_ALL} {Fore.WHITE}{cbz_name}{Style.RESET_ALL} {Fore.MAGENTA}(ID: {gallery_id}){Style.RESET_ALL} - {page_count} pages")
     img_files = download_images(media_id, pages, tmp_folder, threads=threads)
     if not img_files:
         print(f"{Fore.RED}[{gallery_id}] No images downloaded. Possibly network error or gallery removed.{Style.RESET_ALL}")
