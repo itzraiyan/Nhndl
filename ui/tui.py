@@ -1,6 +1,5 @@
-from .banner import show_banner
-from .colors import c
-from .grid import print_grid
+from ui.banner import show_banner
+from ui.colors import c
 from core.search import search_nhentai
 from core.downloader import download_gallery
 
@@ -18,20 +17,12 @@ class NhndlTUI:
                 print(c("green", "Goodbye!"))
                 break
             elif user.lower().startswith("search"):
-                keyword = input("Keyword: ").strip()
-                res = search_nhentai(keyword)
-                print_grid([f"[{i+1}] {r['title']} (ID: {r['id']})" for i, r in enumerate(res)], cols=1)
-                sel = input("Select number to download, or Enter to skip: ").strip()
-                if sel.isdigit() and 1 <= int(sel) <= len(res):
-                    r = res[int(sel)-1]
-                    # TODO: Fetch meta+image_urls from API
-                    meta = {"id": r['id'], "title": r['title']}
-                    image_urls = [] # fake; fill in later
-                    download_gallery(r['id'], self.config, meta, image_urls)
+                selected_ids = search_nhentai()
+                if selected_ids:
+                    for gid in selected_ids:
+                        download_gallery(gid, dest_dir=self.config.get("download_dir"))
+                continue
             else:
                 # Assume it's a direct download
                 gid = user
-                # TODO: Fetch meta+image_urls from API
-                meta = {"id": gid, "title": gid}
-                image_urls = []
-                download_gallery(gid, self.config, meta, image_urls)
+                download_gallery(gid, dest_dir=self.config.get("download_dir"))
