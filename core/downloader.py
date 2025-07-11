@@ -239,3 +239,19 @@ def download_gallery(
             print(f"{Fore.RED}[ERROR]{Style.RESET_ALL} PDF export failed: {e}")
 
     clean_folder(tmp_folder)
+
+def parse_multiple_inputs(input_string):
+    """
+    Accepts multiple URLs/IDs (with or without #), comma, space, or newline separated.
+    Returns a cleaned list of IDs or URLs.
+    """
+    import re
+    items = re.split(r'[\s,]+', input_string)
+    cleaned = []
+    for item in items:
+        item = item.strip()
+        if item.startswith("#"):
+            item = item[1:]
+        if item:
+            cleaned.append(item)
+    return cleaned
