@@ -1,5 +1,6 @@
 import json
 import os
+from config import NHNDL_HISTORY, ensure_dirs
 
 def is_downloaded(gallery_id, config):
     hist = _load_history(config)
@@ -11,7 +12,8 @@ def mark_downloaded(gallery_id, config):
     _save_history(hist, config)
 
 def _load_history(config):
-    f = config.get("history_file")
+    ensure_dirs()
+    f = config.get("history_file", NHNDL_HISTORY)
     if not os.path.exists(f):
         return {}
     try:
@@ -21,7 +23,8 @@ def _load_history(config):
         return {}
 
 def _save_history(hist, config):
-    f = config.get("history_file")
+    ensure_dirs()
+    f = config.get("history_file", NHNDL_HISTORY)
     try:
         with open(f, "w", encoding="utf-8") as fp:
             json.dump(hist, fp)
