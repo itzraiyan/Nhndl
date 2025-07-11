@@ -9,23 +9,23 @@ from config import NHNDL_HOME, NHNDL_DOWNLOADS, NHNDL_CONFIG, save_config, load_
 
 def show_batch_txt_guide():
     print(c("cyan", "\n--- Batch Download from TXT Guide ---"))
-    print(c("yellow", "• Put one gallery ID (123456), #ID (#123456), or full URL (https://nhentai.net/g/123456) per line."))
-    print(c("yellow", "• Blank lines or lines beginning with # are ignored."))
-    print(c("yellow", "• To group multiple galleries into a series, use lines starting with '>>', like:"))
-    print(c("white", "  >> My Series Name"))
+    print(c("yellow", "• Put one gallery ID, #ID, or nhentai URL per line."))
+    print(c("yellow", "• Example:"))
     print(c("white", "  123456"))
+    print(c("white", "  #123456"))
     print(c("white", "  https://nhentai.net/g/789012"))
-    print(c("white", "  #445566"))
-    print(c("yellow", "• All galleries under the last '>>' go into a folder named after the series."))
-    print(c("yellow", "• Single galleries (not under any '>>') are downloaded normally.\n"))
-    print(c("yellow", f"Place your txt file anywhere and enter the full path, or put it in {NHNDL_HOME} for convenience."))
-    print(c("cyan", "\n[Tip] How to get the full path of your .txt file:"))
-    print(c("yellow", "• On Linux/Termux: Open a new session in your terminal, and use the command:"))
-    print(c("white", "  realpath yourfile.txt"))
-    print(c("yellow", "  This will print the absolute path, which you can copy and paste when prompted."))
-    print(c("yellow", "• On Windows: Right-click the file while holding Shift, then select 'Copy as path'."))
-    print(c("green", f"\n[Info] You can keep your main batch list at {os.path.join(NHNDL_HOME, 'list.txt')} and add new downloads by editing it anytime!"))
-    print(c("yellow", f"If you create a new file, always make sure it's in your home directory for best compatibility."))
+    print(c("yellow", "• To group into a folder, start line with '>>', e.g.:"))
+    print(c("white", "  >> My Series"))
+    print(c("white", "  111111"))
+    print(c("white", "  222222"))
+    print(c("yellow", "• Place your .txt file in your Nhndl folder or give its full path."))
+    print(c("yellow", "• You can use or edit the default list at ~/Nhndl/list.txt.\n"))
+    print(c("cyan", "Need help finding the file path? See 'Advanced Tips' below."))
+
+    print(c("magenta", "\n--- Advanced Tips (optional) ---"))
+    print(c("yellow", "• To get the full path of your file:"))
+    print(c("white", "  Linux/Termux: realpath yourfile.txt"))
+    print(c("white", "  Windows: Shift+Right-click the file, then 'Copy as path'"))
 
 def ensure_default_list_txt():
     """Create ~/Nhndl/list.txt if it doesn't exist."""
