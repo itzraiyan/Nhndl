@@ -17,6 +17,18 @@ def parse_multiple_inputs(input_string):
             cleaned.append(item)
     return cleaned
 
+def show_template_help():
+    print(c("cyan", "\n--- Filename Template Help ---"))
+    print(c("yellow", "You can use the following placeholders:"))
+    print(c("white", "{id}       - Gallery ID"))
+    print(c("white", "{title}    - English title (fallback Japanese/title if not available)"))
+    print(c("white", "{media_id} - NHentai media ID (for images)"))
+    print(c("white", "{pages}    - Number of pages"))
+    print(c("white", "{language} - Language tag (e.g. english, japanese)"))
+    print(c("white", "{ext}      - File extension (cbz/pdf)"))
+    print(c("yellow", "Example: {id} - {title} [{language}]"))
+    print("")
+
 def settings_menu(config):
     while True:
         print(c("yellow", "\n--- Settings ---"))
@@ -24,9 +36,10 @@ def settings_menu(config):
         print(c("cyan", f"2. Threads: {config['threads']}"))
         print(c("cyan", f"3. Filename Template: {config['filename_template']}"))
         print(c("cyan", f"4. Max Filename Length: {config['max_filename_len']}"))
-        print(c("cyan", f"5. Save as PDF (experimental): {config.get('save_pdf', False)}"))
-        print(c("cyan", f"6. Return to main menu"))
-        choice = input(c("magenta", "Choose option (1-6): ")).strip()
+        print(c("cyan", f"5. Output Format: {config.get('output_format', 'cbz')}"))
+        print(c("cyan", f"6. Show filename template help"))
+        print(c("cyan", f"7. Return to main menu"))
+        choice = input(c("magenta", "Choose option (1-7): ")).strip()
         if choice == "1":
             new_dir = input("Enter new download directory: ").strip()
             if new_dir:
@@ -36,17 +49,30 @@ def settings_menu(config):
             if val.isdigit():
                 config['threads'] = int(val)
         elif choice == "3":
-            new_tpl = input("Enter new filename template (e.g. {id} - {title}): ").strip()
-            if new_tpl:
+            new_tpl = input("Enter new filename template (type 'help' for options): ").strip()
+            if new_tpl.lower() == "help":
+                show_template_help()
+            elif new_tpl:
                 config['filename_template'] = new_tpl
         elif choice == "4":
             val = input("Enter max filename length: ").strip()
             if val.isdigit():
                 config['max_filename_len'] = int(val)
         elif choice == "5":
-            val = input("Save downloads as PDF too? (y/n): ").strip().lower()
-            config['save_pdf'] = (val == "y")
+            print(c("yellow", "Choose output format:"))
+            print(c("white", "1. CBZ only"))
+            print(c("white", "2. PDF only"))
+            print(c("white", "3. Both CBZ and PDF"))
+            fmt = input("Format (1/2/3): ").strip()
+            if fmt == "1":
+                config['output_format'] = "cbz"
+            elif fmt == "2":
+                config['output_format'] = "pdf"
+            elif fmt == "3":
+                config['output_format'] = "both"
         elif choice == "6":
+            show_template_help()
+        elif choice == "7":
             break
 
 def main_menu():
@@ -60,6 +86,11 @@ def main_menu():
 class NhndlTUI:
     def __init__(self, config):
         self.config = config
+        # Set default download dir if not set:
+        if not self.config.get('download_dir'):
+            self.config['download_dir'] = os.path.expanduser("~/Nhndl/Downloads")
+        else:
+            self.config['download_dir'] = os.path.expanduser(self.config['download_dir'])
 
     def run(self):
         show_banner()
@@ -70,13 +101,27 @@ class NhndlTUI:
                 user_input = input(c("red", "Enter URLs/IDs (comma/space/newline separated): "))
                 entries = parse_multiple_inputs(user_input)
                 for entry in entries:
-                    download_gallery(entry, dest_dir=self.config.get("download_dir"))
+                    download_gallery(
+                        entry,
+                        dest_dir=self.config.get("download_dir"),
+                        threads=self.config.get("threads", 12),
+                        output_format=self.config.get("output_format", "cbz"),
+                        filename_template=self.config.get("filename_template", "{id} - {title}"),
+                        max_filename_len=self.config.get("max_filename_len", 150)
+                    )
             elif choice == "2":
                 while True:
                     selected_ids = search_nhentai()
                     if selected_ids:
                         for gid in selected_ids:
-                            download_gallery(gid, dest_dir=self.config.get("download_dir"))
+                            download_gallery(
+                                gid,
+                                dest_dir=self.config.get("download_dir"),
+                                threads=self.config.get("threads", 12),
+                                output_format=self.config.get("output_format", "cbz"),
+                                filename_template=self.config.get("filename_template", "{id} - {title}"),
+                                max_filename_len=self.config.get("max_filename_len", 150)
+                            )
                         again = input("Search again? (y/n): ").strip().lower()
                         if again != "y":
                             break
