@@ -9,12 +9,18 @@ from config import NHNDL_HOME, NHNDL_DOWNLOADS, NHNDL_CONFIG, save_config, load_
 
 def show_batch_txt_guide():
     print(c("cyan", "\n--- Batch Download from TXT Guide ---"))
-    print(c("yellow", "• Put one gallery ID, #ID, or nhentai URL per line."))
+    print(c("yellow", "• One gallery ID, #ID, or nhentai URL per line."))
+    print(c("yellow", "• To group into a folder, start a line with '>>', e.g.:"))
+    print(c("white", "  >> My Series"))
+    print(c("white", "  111111"))
+    print(c("white", "  222222"))
+    print(c("yellow", "• IMPORTANT: Leave a blank line before starting a group (series) section,"))
+    print(c("yellow", "  and between single entries and grouped entries."))
     print(c("yellow", "• Example:"))
     print(c("white", "  123456"))
     print(c("white", "  #123456"))
     print(c("white", "  https://nhentai.net/g/789012"))
-    print(c("yellow", "• To group into a folder, start line with '>>', e.g.:"))
+    print(c("white", "  "))  # This prints a visible blank line in code, but will be empty in the terminal
     print(c("white", "  >> My Series"))
     print(c("white", "  111111"))
     print(c("white", "  222222"))
