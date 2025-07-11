@@ -4,6 +4,7 @@ from core.search import search_nhentai
 from core.downloader import download_gallery
 import re
 import os
+from config import NHNDL_HOME, NHNDL_DOWNLOADS, NHNDL_CONFIG, save_config, load_config, ensure_dirs
 
 def parse_multiple_inputs(input_string):
     # Accepts multiple URLs/IDs (with or without #), comma, space, or newline separated
@@ -31,14 +32,14 @@ def show_template_help():
 
 def settings_menu(config):
     while True:
-        print(c("yellow", "\n--- Settings ---"))
+        print(c("yellow", f"\n--- Settings --- (All settings/config/history are stored in {NHNDL_HOME})"))
         print(c("cyan", f"1. Download Directory: {config['download_dir']}"))
         print(c("cyan", f"2. Threads: {config['threads']}"))
         print(c("cyan", f"3. Filename Template: {config['filename_template']}"))
         print(c("cyan", f"4. Max Filename Length: {config['max_filename_len']}"))
         print(c("cyan", f"5. Output Format: {config.get('output_format', 'cbz')}"))
         print(c("cyan", f"6. Show filename template help"))
-        print(c("cyan", f"7. Return to main menu"))
+        print(c("cyan", f"7. Save and return to main menu"))
         choice = input(c("magenta", "Choose option (1-7): ")).strip()
         if choice == "1":
             new_dir = input("Enter new download directory: ").strip()
@@ -73,6 +74,8 @@ def settings_menu(config):
         elif choice == "6":
             show_template_help()
         elif choice == "7":
+            save_config(config)
+            print(c("green", f"Settings saved to {NHNDL_CONFIG}. Returning to main menu."))
             break
 
 def main_menu():
@@ -86,9 +89,10 @@ def main_menu():
 class NhndlTUI:
     def __init__(self, config):
         self.config = config
-        # Set default download dir if not set:
+        ensure_dirs()
+        # Always use the default if missing or blank
         if not self.config.get('download_dir'):
-            self.config['download_dir'] = os.path.expanduser("~/Nhndl/Downloads")
+            self.config['download_dir'] = NHNDL_DOWNLOADS
         else:
             self.config['download_dir'] = os.path.expanduser(self.config['download_dir'])
 
