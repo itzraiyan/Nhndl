@@ -2,88 +2,59 @@ from ui.banner import show_banner
 from ui.colors import c
 from core.search import search_nhentai
 from core.downloader import download_gallery
+from core.downloader import parse_multiple_inputs  # Import for reuse in batch txt
 import re
 import os
 from config import NHNDL_HOME, NHNDL_DOWNLOADS, NHNDL_CONFIG, save_config, load_config, ensure_dirs
 
-def parse_multiple_inputs(input_string):
-    # Accepts multiple URLs/IDs (with or without #), comma, space, or newline separated
-    items = re.split(r'[\s,]+', input_string)
-    cleaned = []
-    for item in items:
-        item = item.strip()
-        if item.startswith("#"):
-            item = item[1:]
-        if item:
-            cleaned.append(item)
-    return cleaned
+def show_batch_txt_guide():
+    print(c("cyan", "\n--- Batch Download from TXT Guide ---"))
+    print(c("yellow", "• Put one gallery ID (123456), #ID (#123456), or full URL (https://nhentai.net/g/123456) per line."))
+    print(c("yellow", "• Blank lines or lines beginning with # are ignored."))
+    print(c("yellow", "• To group multiple galleries into a series, use lines starting with '>>', like:"))
+    print(c("white", "  >> My Series Name"))
+    print(c("white", "  123456"))
+    print(c("white", "  https://nhentai.net/g/789012"))
+    print(c("white", "  #445566"))
+    print(c("yellow", "• All galleries under the last '>>' go into a folder named after the series."))
+    print(c("yellow", "• Single galleries (not under any '>>') are downloaded normally.\n"))
+    print(c("yellow", f"Place your txt file anywhere and enter the full path, or put it in {NHNDL_HOME} for convenience."))
 
-def show_template_help():
-    print(c("cyan", "\n--- Filename Template Help ---"))
-    print(c("yellow", "You can use the following placeholders:"))
-    print(c("white", "{id}       - Gallery ID"))
-    print(c("white", "{title}    - English title (fallback Japanese/title if not available)"))
-    print(c("white", "{media_id} - NHentai media ID (for images)"))
-    print(c("white", "{pages}    - Number of pages"))
-    print(c("white", "{language} - Language tag (e.g. english, japanese)"))
-    print(c("white", "{ext}      - File extension (cbz/pdf)"))
-    print(c("yellow", "Example: {id} - {title} [{language}]"))
-    print("")
-
-def settings_menu(config):
-    while True:
-        print(c("yellow", f"\n--- Settings --- (All settings/config/history are stored in {NHNDL_HOME})"))
-        print(c("cyan", f"1. Download Directory: {config['download_dir']}"))
-        print(c("cyan", f"2. Threads: {config['threads']}"))
-        print(c("cyan", f"3. Filename Template: {config['filename_template']}"))
-        print(c("cyan", f"4. Max Filename Length: {config['max_filename_len']}"))
-        print(c("cyan", f"5. Output Format: {config.get('output_format', 'cbz')}"))
-        print(c("cyan", f"6. Show filename template help"))
-        print(c("cyan", f"7. Save and return to main menu"))
-        choice = input(c("magenta", "Choose option (1-7): ")).strip()
-        if choice == "1":
-            new_dir = input("Enter new download directory: ").strip()
-            if new_dir:
-                config['download_dir'] = os.path.expanduser(new_dir)
-        elif choice == "2":
-            val = input("Enter max thread count: ").strip()
-            if val.isdigit():
-                config['threads'] = int(val)
-        elif choice == "3":
-            new_tpl = input("Enter new filename template (type 'help' for options): ").strip()
-            if new_tpl.lower() == "help":
-                show_template_help()
-            elif new_tpl:
-                config['filename_template'] = new_tpl
-        elif choice == "4":
-            val = input("Enter max filename length: ").strip()
-            if val.isdigit():
-                config['max_filename_len'] = int(val)
-        elif choice == "5":
-            print(c("yellow", "Choose output format:"))
-            print(c("white", "1. CBZ only"))
-            print(c("white", "2. PDF only"))
-            print(c("white", "3. Both CBZ and PDF"))
-            fmt = input("Format (1/2/3): ").strip()
-            if fmt == "1":
-                config['output_format'] = "cbz"
-            elif fmt == "2":
-                config['output_format'] = "pdf"
-            elif fmt == "3":
-                config['output_format'] = "both"
-        elif choice == "6":
-            show_template_help()
-        elif choice == "7":
-            save_config(config)
-            print(c("green", f"Settings saved to {NHNDL_CONFIG}. Returning to main menu."))
-            break
+def parse_batch_txt(txt_path):
+    """
+    Parses batch .txt file into: 
+    - singles: [id_or_url, ...]
+    - series: {series_name: [id_or_url, ...], ...}
+    """
+    singles = []
+    series = {}
+    current_series = None
+    try:
+        with open(txt_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.startswith(">>"):
+                    current_series = line[2:].strip()
+                    if current_series not in series:
+                        series[current_series] = []
+                else:
+                    if current_series:
+                        series[current_series].append(line)
+                    else:
+                        singles.append(line)
+    except Exception as e:
+        print(c("red", f"[ERROR] Could not read TXT: {e}"))
+    return singles, series
 
 def main_menu():
     print(c("cyan", "What do you want to do?"))
     print(c("yellow", "1. Download by URLs/IDs"))
     print(c("yellow", "2. Search and download"))
-    print(c("yellow", "3. Settings"))
-    print(c("yellow", "4. Exit"))
+    print(c("yellow", "3. Batch download from TXT"))
+    print(c("yellow", "4. Settings"))
+    print(c("yellow", "5. Exit"))
     return input(c("magenta", "Choice: ")).strip()
 
 class NhndlTUI:
@@ -132,9 +103,49 @@ class NhndlTUI:
                     else:
                         break
             elif choice == "3":
-                settings_menu(self.config)
+                show_batch_txt_guide()
+                path = input(c("magenta", "Enter path to your .txt file: ")).strip()
+                if not path or not os.path.exists(path):
+                    print(c("red", f"[ERROR] File does not exist: {path}"))
+                    continue
+                singles, series = parse_batch_txt(path)
+                # Download singles
+                for entry in singles:
+                    download_gallery(
+                        entry,
+                        dest_dir=self.config.get("download_dir"),
+                        threads=self.config.get("threads", 12),
+                        output_format=self.config.get("output_format", "cbz"),
+                        filename_template=self.config.get("filename_template", "{id} - {title}"),
+                        max_filename_len=self.config.get("max_filename_len", 150)
+                    )
+                # Download series (in subfolders)
+                for series_name, entries in series.items():
+                    folder = os.path.join(self.config.get("download_dir"), safe_folder(series_name))
+                    os.makedirs(folder, exist_ok=True)
+                    for entry in entries:
+                        download_gallery(
+                            entry,
+                            dest_dir=folder,
+                            threads=self.config.get("threads", 12),
+                            output_format=self.config.get("output_format", "cbz"),
+                            filename_template=self.config.get("filename_template", "{id} - {title}"),
+                            max_filename_len=self.config.get("max_filename_len", 150)
+                        )
+                print(c("green", "Batch download complete."))
             elif choice == "4":
+                settings_menu(self.config)
+            elif choice == "5":
                 print(c("green", "Goodbye!"))
                 break
             else:
                 print(c("red", "Invalid choice. Try again."))
+
+def safe_folder(name, max_len=80):
+    # For series folders, sanitize
+    import re
+    name = re.sub(r'[<>:"/\\|?*]', '', name)
+    name = re.sub(r'\s+', ' ', name).strip()
+    if len(name) > max_len:
+        name = name[:max_len].rstrip()
+    return name
