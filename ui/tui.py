@@ -9,24 +9,35 @@ from config import NHNDL_HOME, NHNDL_DOWNLOADS, NHNDL_CONFIG, save_config, load_
 
 def show_batch_txt_guide():
     print(c("cyan", "\n--- Batch Download from TXT Guide ---"))
-    print(c("yellow", "• One gallery ID, #ID, or nhentai URL per line."))
-    print(c("yellow", "• To group into a folder, start a line with '>>', e.g.:"))
-    print(c("white", "  >> My Series"))
-    print(c("white", "  111111"))
-    print(c("white", "  222222"))
-    print(c("yellow", "• IMPORTANT: Leave a blank line before starting a group (series) section,"))
-    print(c("yellow", "  and between single entries and grouped entries."))
-    print(c("yellow", "• Example:"))
+    print(c("yellow", "How to organize your download list:"))
+    print(c("yellow", "• Each single entry (gallery ID, #ID, or URL) goes on its own line."))
+    print(c("yellow", "• To start a group (folder), leave a blank line, then write '>> Folder Name' on a new line."))
+    print(c("yellow", "  Add any entries you want in that group below it, one per line."))
+    print(c("yellow", "• To start more single entries or another group, leave another blank line."))
+    print(c("yellow", "• Lines starting with # are ignored (comments)."))
+    print(c("yellow", "• Always use a blank line to switch between singles and groups, or between groups."))
+    print(c("yellow", "• Place your .txt file in your Nhndl folder or give its full path."))
+    print(c("yellow", "• You can use or edit the default list at ~/Nhndl/list.txt.\n"))
+
+    print(c("yellow", "Example:"))
     print(c("white", "  123456"))
     print(c("white", "  #123456"))
     print(c("white", "  https://nhentai.net/g/789012"))
-    print(c("white", "  "))  # This prints a visible blank line in code, but will be empty in the terminal
+    print(c("white", ""))  # Blank line to start a group
     print(c("white", "  >> My Series"))
     print(c("white", "  111111"))
     print(c("white", "  222222"))
-    print(c("yellow", "• Place your .txt file in your Nhndl folder or give its full path."))
-    print(c("yellow", "• You can use or edit the default list at ~/Nhndl/list.txt.\n"))
-    print(c("cyan", "Need help finding the file path? See 'Advanced Tips' below."))
+    print(c("white", "  333333"))
+    print(c("white", ""))  # Blank line to start more singles
+    print(c("white", "  555555"))
+    print(c("white", "  666666"))
+    print(c("white", ""))  # Another blank line to start another group
+    print(c("white", "  >> Other Stuff"))
+    print(c("white", "  777777"))
+    print(c("white", "  888888"))
+
+    print(c("cyan", "\nTip: Always use a blank line to switch between single entries and groups, or to start a new group."))
+    print(c("cyan", "Need help finding your file path? See 'Advanced Tips' below."))
 
     print(c("magenta", "\n--- Advanced Tips (optional) ---"))
     print(c("yellow", "• To get the full path of your file:"))
@@ -41,12 +52,11 @@ def ensure_default_list_txt():
             with open(path, "w", encoding="utf-8") as f:
                 f.write("# Your NHNDL batch download list\n")
                 f.write("# Add one gallery ID or URL per line. Lines starting with # are ignored.\n")
-                f.write("# Example:\n")
-                f.write("123456\n")
-                f.write("https://nhentai.net/g/789012\n")
-                f.write(">> My Series\n")
-                f.write("112233\n")
-                f.write("#445566\n")
+                f.write("# Leave a blank line to separate singles and groups.\n")
+                f.write("123456\n#123456\nhttps://nhentai.net/g/789012\n\n")
+                f.write(">> My Series\n111111\n222222\n333333\n\n")
+                f.write("555555\n666666\n\n")
+                f.write(">> Other Stuff\n777777\n888888\n")
             print(c("green", f"\nCreated default list.txt at {path}. Edit this file to add or remove galleries anytime!\n"))
         except Exception as e:
             print(c("red", f"[ERROR] Could not create default list.txt: {e}"))
@@ -160,22 +170,37 @@ def safe_folder(name, max_len=80):
 def parse_batch_txt(txt_path):
     singles = []
     series = {}
-    current_series = None
+    mode = "singles"
+    group_name = None
+    current_entries = []
+
+    def flush_block():
+        nonlocal current_entries, mode, group_name
+        if mode == "singles" and current_entries:
+            singles.extend(current_entries)
+        elif mode == "group" and group_name and current_entries:
+            if group_name not in series:
+                series[group_name] = []
+            series[group_name].extend(current_entries)
+        current_entries = []
+        group_name = None
+        mode = "singles"
+
     try:
         with open(txt_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
+            for raw_line in f:
+                line = raw_line.strip()
                 if not line or line.startswith("#"):
+                    flush_block()
                     continue
                 if line.startswith(">>"):
-                    current_series = line[2:].strip()
-                    if current_series not in series:
-                        series[current_series] = []
+                    flush_block()
+                    group_name = line[2:].strip()
+                    mode = "group"
                 else:
-                    if current_series:
-                        series[current_series].append(line)
-                    else:
-                        singles.append(line)
+                    current_entries.append(line)
+            # Flush any remaining block at EOF
+            flush_block()
     except Exception as e:
         print(c("red", f"[ERROR] Could not read TXT: {e}"))
     return singles, series
