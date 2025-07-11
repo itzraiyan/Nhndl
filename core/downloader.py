@@ -95,7 +95,29 @@ def get_cbz_page_count(cbz_path):
     except Exception:
         return 0
 
-def download_gallery(arg, dest_dir=None, custom_cbz=None, threads=MAX_IMAGE_THREADS, save_pdf=False):
+def get_filename_from_template(template, meta, ext, max_len=150):
+    mapping = {
+        'id': meta.get('id', ''),
+        'title': meta.get('title', ''),
+        'media_id': meta.get('media_id', ''),
+        'pages': str(meta.get('pages', '')),
+        'language': meta.get('language', ''),
+        'ext': ext
+    }
+    result = template
+    for k, v in mapping.items():
+        result = result.replace(f'{{{k}}}', str(v))
+    return safe_filename(result, max_len=max_len)
+
+def download_gallery(
+    arg,
+    dest_dir=None,
+    custom_cbz=None,
+    threads=MAX_IMAGE_THREADS,
+    output_format="cbz",
+    filename_template="{id} - {title}",
+    max_filename_len=150
+):
     try:
         gallery_id = get_gallery_id(arg)
     except Exception as e:
@@ -108,38 +130,71 @@ def download_gallery(arg, dest_dir=None, custom_cbz=None, threads=MAX_IMAGE_THRE
         print(f"{Fore.RED}[ERROR]{Style.RESET_ALL} Failed to fetch {arg}: {e}")
         return
 
-    title = data['title']['english'] or data['title']['japanese'] or gallery_id
-    safe_title = safe_filename(title)
-    cbz_name = custom_cbz if custom_cbz else f"{safe_title}.cbz"
+    # Gather meta for naming
+    meta = {
+        'id': str(gallery_id),
+        'title': data['title']['english'] or data['title']['japanese'] or str(gallery_id),
+        'media_id': data['media_id'],
+        'pages': len(data['images']['pages']),
+        'language': data.get('tags', [{}])[0].get('name', '')  # crude, get first tag as language if possible
+    }
+    safe_title = safe_filename(meta['title'], max_len=max_filename_len)
+
+    # Decide file extensions and paths
+    cbz_name = get_filename_from_template(filename_template, meta, "cbz", max_len=max_filename_len) + ".cbz"
+    pdf_name = get_filename_from_template(filename_template, meta, "pdf", max_len=max_filename_len) + ".pdf"
+
     cbz_path = os.path.join(dest_dir, cbz_name) if dest_dir else cbz_name
+    pdf_path = os.path.join(dest_dir, pdf_name) if dest_dir else pdf_name
 
     if len(cbz_path) > 240:
-        safe_title = safe_title[:230]
-        cbz_name = custom_cbz if custom_cbz else f"{safe_title}.cbz"
+        cbz_name = cbz_name[:230] + ".cbz"
         cbz_path = os.path.join(dest_dir, cbz_name) if dest_dir else cbz_name
+
+    if len(pdf_path) > 240:
+        pdf_name = pdf_name[:230] + ".pdf"
+        pdf_path = os.path.join(dest_dir, pdf_name) if dest_dir else pdf_name
 
     media_id = data['media_id']
     pages = data['images']['pages']
     page_count = len(pages)
 
     # --- Error Handling: Existing File Check ---
-    if os.path.exists(cbz_path):
+    skip_cbz = False
+    skip_pdf = False
+
+    if output_format in ("cbz", "both") and os.path.exists(cbz_path):
         existing_count = get_cbz_page_count(cbz_path)
         if existing_count == page_count:
             print(f"{Fore.CYAN}[SKIP]{Style.RESET_ALL} {cbz_path} already exists with {existing_count} pages.")
-            return
+            skip_cbz = True
         else:
             print(f"{Fore.YELLOW}[WARNING]{Style.RESET_ALL} File '{cbz_path}' exists with {existing_count} pages, but gallery has {page_count} pages.")
             resp = input(f"Do you want to overwrite the existing file? (y/n): ").strip().lower()
             if resp != 'y':
-                print(f"{Fore.LIGHTYELLOW_EX}Skipping download for: {cbz_path}{Style.RESET_ALL}")
-                return
+                print(f"{Fore.LIGHTYELLOW_EX}Skipping CBZ for: {cbz_path}{Style.RESET_ALL}")
+                skip_cbz = True
             else:
                 print(f"{Fore.YELLOW}Overwriting: {cbz_path}{Style.RESET_ALL}")
 
+    if output_format in ("pdf", "both") and os.path.exists(pdf_path):
+        # For PDF, we cannot easily check page count, so just ask
+        print(f"{Fore.YELLOW}[WARNING]{Style.RESET_ALL} PDF file '{pdf_path}' already exists.")
+        resp = input(f"Do you want to overwrite the existing PDF? (y/n): ").strip().lower()
+        if resp != 'y':
+            print(f"{Fore.LIGHTYELLOW_EX}Skipping PDF for: {pdf_path}{Style.RESET_ALL}")
+            skip_pdf = True
+        else:
+            print(f"{Fore.YELLOW}Overwriting: {pdf_path}{Style.RESET_ALL}")
+
+    if (output_format == "cbz" and skip_cbz) or (output_format == "pdf" and skip_pdf):
+        return
+    if output_format == "both" and skip_cbz and skip_pdf:
+        return
+
     tmp_folder = f"tmp_{gallery_id}"
 
-    print(f"{Fore.GREEN}==> Downloading:{Style.RESET_ALL} {Fore.WHITE}{cbz_name}{Style.RESET_ALL} {Fore.MAGENTA}(ID: {gallery_id}){Style.RESET_ALL} - {page_count} pages")
+    print(f"{Fore.GREEN}==> Downloading:{Style.RESET_ALL} {Fore.WHITE}{safe_title}{Style.RESET_ALL} {Fore.MAGENTA}(ID: {gallery_id}){Style.RESET_ALL} - {page_count} pages")
     img_files = download_images(media_id, pages, tmp_folder, threads=threads)
     if not img_files:
         print(f"{Fore.RED}[{gallery_id}] No images downloaded. Possibly network error or gallery removed.{Style.RESET_ALL}")
@@ -153,21 +208,18 @@ def download_gallery(arg, dest_dir=None, custom_cbz=None, threads=MAX_IMAGE_THRE
         clean_folder(tmp_folder)
         return
 
-    try:
-        create_cbz(img_files, cbz_path)
-    except Exception as e:
-        print(f"{Fore.RED}[ERROR]{Style.RESET_ALL} {safe_title}: {e}")
-        clean_folder(tmp_folder)
-        return
-
-    # PDF export if enabled
-    if save_pdf:
+    if output_format in ("cbz", "both") and not skip_cbz:
         try:
-            pdf_path = os.path.join(dest_dir, f"{safe_title}.pdf") if dest_dir else f"{safe_title}.pdf"
+            create_cbz(img_files, cbz_path)
+            print(f"{Fore.LIGHTGREEN_EX}Saved as: {cbz_path}{Style.RESET_ALL}")
+        except Exception as e:
+            print(f"{Fore.RED}[ERROR]{Style.RESET_ALL} {safe_title}: {e}")
+
+    if output_format in ("pdf", "both") and not skip_pdf:
+        try:
             images_to_pdf(img_files, pdf_path)
             print(f"{Fore.LIGHTGREEN_EX}Saved as PDF: {pdf_path}{Style.RESET_ALL}")
         except Exception as e:
             print(f"{Fore.RED}[ERROR]{Style.RESET_ALL} PDF export failed: {e}")
 
     clean_folder(tmp_folder)
-    print(f"{Fore.LIGHTGREEN_EX}Saved as: {cbz_path}{Style.RESET_ALL}\n")
